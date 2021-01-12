@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
@@ -12,7 +13,7 @@ new_image = Image.new("RGB", (1280, 800), "black")
 
 def scaleImage(im):
     width, height = im.size
-    screen_y, screen_x = Ui_MainWindow.returnScreenSize(Ui_MainWindow)
+    #screen_x, screen_y = ui.returnScreenSize()
     if width == screen_x and height == screen_y:
         return im
     if width > height:                                                          #landscape
@@ -46,6 +47,54 @@ def scaleImage(im):
             new_width = width * ratio
             new_image = im.resize((int(new_width), screen_y), Image.ANTIALIAS)
     return new_image
+
+
+class portrait_doubler():
+    firstImage = None
+    return_image = None
+    blank_image = Image.new("RGB", (screen_x, screen_y), "black")
+
+    def stitch_em(self,portrait_image):
+        if self.firstImage == None:
+            self.firstImage = portrait_image
+            return None
+        else:
+            if self.first_image.size[0] + portrait_image.size[0] < screen_x:
+                border = (screen_x-(self.first_image.size[0]+portrait_image.size[0]))/3
+                self.blank_image.paste(self.first_image, (int(border),0))
+                self.blank_image.paste(portrait_image, ((int(border)+int(border)+self.first_image.size[0]), 0))
+                self.return_image = self.blank_image
+                self.GOT_FIRST_IMAGE = False
+                self.blank_image = Image.new("RGB", (screen_x, screen_y), "black")
+                self.first_image = self.blank_image
+                return self.return_image
+            elif self.first_image.size[0] + portrait_image.size[0] == screen_x:
+                self.blank_image.paste(self.first_image, (0,0))
+                self.blank_image.paste(portrait_image, ((self.first_image.size[0], 0)))
+                self.return_image = self.blank_image
+                self.GOT_FIRST_IMAGE = False
+                self.blank_image = Image.new("RGB", (screen_x, screen_y), "black")
+                self.first_image = self.blank_image
+                return self.return_image
+            else:                           #add code for width too wide
+                if self.first_image.size[0] > screen_x/2:
+                    xtra = self.first_image.size[0] - screen_x/2
+                    chop = int(xtra/2)
+                    box = (chop, 0, int(chop+(screen_x/2)), screen_y)
+                    self.first_image = self.first_image.crop(box)
+                if portrait_image.size[0] > screen_x/2:
+                    xtra = portrait_image.size[0] - screen_x/2
+                    chop = int(xtra/2)
+                    box = (chop, 0, int(chop+(screen_x/2)), screen_y)
+                    portrait_image = portrait_image.crop(box)
+                self.blank_image.paste(self.first_image, (0,0))
+                self.blank_image.paste(portrait_image, ((self.first_image.size[0], 0)))
+                self.return_image = self.blank_image
+                self.GOT_FIRST_IMAGE = False
+                self.first_image = self.blank_image
+
+                self.blank_image = Image.new("RGB", (screen_x, screen_y), "black")
+                return self.return_image
 
 
 
@@ -95,7 +144,7 @@ class Ui_MainWindow(QObject):
 
     def returnScreenSize(self):
         sizeObject = QDesktopWidget().screenGeometry(-1)
-        return  sizeObject.height(), sizeObject.width()
+        return  sizeObject.width(), sizeObject.height()
 
     def mousePressEvent(self, e):
         print("mousePressEvent")
@@ -109,15 +158,29 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
+    screen_x, screen_y = ui.returnScreenSize()
+    doubler = portrait_doubler()
 
-    im = Image.open('em7.jpg', 'r')
-    new_image = scaleImage(im)
-    new_image.save('em7.jpg')
-    pix = QPixmap('em7.jpg')
-    item = QGraphicsPixmapItem(pix)
-    scene = QGraphicsScene()
-    scene.addItem(item)
-    ui.graphicsView.setScene(scene)
+    image_list = [os.path.join("C:\\Users\\riche\\PycharmProjects\\Image-Video-Frame", f) for f in os.listdir("C:\\Users\\riche\PycharmProjects\\Image-Video-Frame") if f.endswith('.jpg')]
+    for img in image_list:
+        next_image = Image.open(img)
+        new_image = scaleImage(img)
+        width, height = new_image.size
+        if height > width:
+            stitched_image = doubler.stitch_em(new_image)
+            if stitched_image == None:
+                continue
+            else:
+                new_image = stitched_image
+
+    # im = Image.open('em7.jpg', 'r')
+    # new_image = scaleImage(im)
+    # new_image.save('em7.jpg')
+    # pix = QPixmap('em7.jpg')
+    # item = QGraphicsPixmapItem(pix)
+    # scene = QGraphicsScene()
+    # scene.addItem(item)
+    # ui.graphicsView.setScene(scene)
 
 
     MainWindow.show()
