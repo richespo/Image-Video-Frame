@@ -1,15 +1,59 @@
 import sys
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import Qt
 from PIL import Image
 from PyQt5.QtCore import QObject, pyqtSlot
 from PyQt5.QtWidgets import QFileDialog, QGraphicsPixmapItem, QGraphicsScene, QDesktopWidget
 
+screen_x, screen_y = 1280, 800
+im = Image.new("RGB", (1280, 800), "black")
+new_image = Image.new("RGB", (1280, 800), "black")
+
+def scaleImage(im):
+    width, height = im.size
+    screen_y, screen_x = Ui_MainWindow.returnScreenSize(Ui_MainWindow)
+    if width == screen_x and height == screen_y:
+        return im
+    if width > height:                                                          #landscape
+        if height > screen_y:                                                    #scale down
+            ratio = height / screen_y
+            new_height = int(height / ratio)
+            new_width = int(width / ratio)# scale the height
+            new_image = im.resize((new_width, new_height), Image.ANTIALIAS)          # resized before crop
+            if new_width > screen_x:                                               # height needs to be cropped
+                increment = (new_width - screen_x) / 2                             # crop 1/2 oversize from each side
+                box = (int(increment), 0, int(screen_x-increment), int(screen_y))      # desired size
+                new_image = new_image.crop(box)
+            return  new_image
+        else:                                                                       #scale up
+            ratio = screen_y / height
+            new_height = int(height * ratio)
+            new_width = int(width * ratio)
+            new_image = im.resize((new_width, new_height), Image.ANTIALIAS)
+            if new_width > screen_x:                                               # height needs to be cropped
+                increment = (new_width - screen_x) / 2                             # crop 1/2 oversize from each side
+                box = (int(increment), 0, int(new_width-increment), int(screen_y))      # desired size
+                new_image = new_image.crop(box)
+            return  new_image
+    else:                                                                           #portrait
+        if height > screen_y:                                                       #scale down
+            ratio = height / screen_y
+            new_width = width / ratio
+            new_image = im.resize((int(new_width), screen_y), Image.ANTIALIAS)
+        else:                                                                        #scale up
+            ratio = screen_y / height
+            new_width = width * ratio
+            new_image = im.resize((int(new_width), screen_y), Image.ANTIALIAS)
+    return new_image
+
+
+
+
 
 class Ui_MainWindow(QObject):
     def setupUi(self, MainWindow):
-        sizeObject = QDesktopWidget().screenGeometry(-1)
-        screen_y, screen_x = sizeObject.height(), sizeObject.width()
+        screen_y, screen_x = self.returnScreenSize()
       #  print(" Screen size : "  + str(sizeObject.height()) + "x"  + str(sizeObject.width()))
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(screen_x, screen_y)
@@ -24,20 +68,21 @@ class Ui_MainWindow(QObject):
         self.graphicsView.setVerticalScrollBarPolicy(1);
         print(self.graphicsView.horizontalScrollBarPolicy() )
         MainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1920, 24))
-        self.menubar.setObjectName("menubar")
-        self.menuOpen = QtWidgets.QMenu(self.menubar)
-        self.menuOpen.setObjectName("menuOpen")
-        MainWindow.setMenuBar(self.menubar)
+        # self.menubar = QtWidgets.QMenuBar(MainWindow)
+        # self.menubar.setGeometry(QtCore.QRect(0, 0, 1920, 24))
+        # self.menubar.setObjectName("menubar")
+        # self.menuOpen = QtWidgets.QMenu(self.menubar)
+        # self.menuOpen.setObjectName("menuOpen")
+        # MainWindow.setMenuBar(self.menubar)
         # self.statusbar = QtWidgets.QStatusBar(MainWindow)
         # self.statusbar.setObjectName("statusbar")
         # MainWindow.setStatusBar(self.statusbar)
-        self.actionOpen = QtWidgets.QAction(MainWindow)
-        self.actionOpen.setObjectName("actionOpen")
-        self.menuOpen.addAction(self.actionOpen)
-        self.menubar.addAction(self.menuOpen.menuAction())
-        self.actionOpen.triggered.connect(self.mymenu)
+        # self.actionOpen = QtWidgets.QAction(MainWindow)
+        # self.actionOpen.setObjectName("actionOpen")
+        # self.menuOpen.addAction(self.actionOpen)
+        # self.menubar.addAction(self.menuOpen.menuAction())
+        # self.actionOpen.triggered.connect(self.mymenu)
+
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -45,20 +90,17 @@ class Ui_MainWindow(QObject):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Viewer"))
-        self.menuOpen.setTitle(_translate("MainWindow", "File"))
-        self.actionOpen.setText(_translate("MainWindow", "Open"))
+        # self.menuOpen.setTitle(_translate("MainWindow", "File"))
+        # self.actionOpen.setText(_translate("MainWindow", "Open"))
+
+    def returnScreenSize(self):
+        sizeObject = QDesktopWidget().screenGeometry(-1)
+        return  sizeObject.height(), sizeObject.width()
+
+    def mousePressEvent(self, e):
+        print("mousePressEvent")
 
   #  @pyqtSlot
-    def mymenu(self):
-        fileName = QFileDialog.getOpenFileName(None, "Open File", "C:", "Image files (*.jpg *.bmp *.jpeg)");
-        # im = Image.open(fileName)
-        # width, height = im.size
-
-        pix = QPixmap(fileName[0])
-        item = QGraphicsPixmapItem(pix)
-        scene = QGraphicsScene(self)
-        scene.addItem(item)
-        self.graphicsView.setScene(scene)
 
 
 if __name__ == "__main__":
@@ -67,5 +109,16 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
+
+    im = Image.open('em7.jpg', 'r')
+    new_image = scaleImage(im)
+    new_image.save('em7.jpg')
+    pix = QPixmap('em7.jpg')
+    item = QGraphicsPixmapItem(pix)
+    scene = QGraphicsScene()
+    scene.addItem(item)
+    ui.graphicsView.setScene(scene)
+
+
     MainWindow.show()
     sys.exit(app.exec_())
